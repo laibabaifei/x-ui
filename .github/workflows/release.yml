@@ -8,6 +8,7 @@ on:
     branches:
       - main
     paths:
+      - '**.yml'
       - '**.js'
       - '**.css'
       - '**.html'
@@ -26,10 +27,10 @@ jobs:
         platform:
           - amd64
           - arm64
-          - armv7
-          - armv6
-          - 386
           - armv5
+          - armv6
+          - armv7
+          - 386
           - s390x
     runs-on: ubuntu-latest
     steps:
@@ -47,46 +48,13 @@ jobs:
           export CGO_ENABLED=1
           export GOOS=linux
           export GOARCH=${{ matrix.platform }}
-          TOOLCHAIN_URL=""
-          MUSL_CC_HOST="https://github.com/musl-cc/musl.cc/releases/download/v0.0.1" #http://musl.cc
-          case "${{ matrix.platform }}" in
-            amd64)
-              TOOLCHAIN_URL="$MUSL_CC_HOST/x86_64-linux-musl-cross.tgz"
-              ;;
-            arm64)
-              TOOLCHAIN_URL="$MUSL_CC_HOST/aarch64-linux-musl-cross.tgz"
-              ;;
-            armv7)
-              TOOLCHAIN_URL="$MUSL_CC_HOST/armv7l-linux-musleabihf-cross.tgz"
-              export GOARCH=arm
-              export GOARM=7
-              ;;
-            armv6)
-              TOOLCHAIN_URL="$MUSL_CC_HOST/armv6-linux-musleabihf-cross.tgz"
-              export GOARCH=arm
-              export GOARM=6
-              ;;
-            armv5)
-              TOOLCHAIN_URL="$MUSL_CC_HOST/arm-linux-musleabi-cross.tgz"
-              export GOARCH=arm
-              export GOARM=5
-              ;;
-            386)
-              TOOLCHAIN_URL="$MUSL_CC_HOST/i686-linux-musl-cross.tgz"
-              ;;
-            s390x)
-              TOOLCHAIN_URL="$MUSL_CC_HOST/s390x-linux-musl-cross.tgz"
-              ;;
-          esac
-          echo "Downloading musl toolchain for ${{ matrix.platform }}"
-          curl -LO "$TOOLCHAIN_URL"
-          tar -xf *.tgz
-          TOOLCHAIN_DIR=$(find . -maxdepth 1 -type d -name "*-cross" | head -n1)
-          TOOLCHAIN_DIR=$(realpath "$TOOLCHAIN_DIR")
-          export PATH="$TOOLCHAIN_DIR/bin:$PATH"
-          # Detect compiler
-          export CC=$(find $TOOLCHAIN_DIR/bin -name '*-gcc' | head -n1)
-          echo "Using CC=$CC"
+          if [[ ${{ matrix.platform }} == armv* ]]; then
+            export GOARCH=arm
+            export GOARM=$(cut -d'v' -f2 <<< ${{ matrix.platform }})
+          fi
+          export PATH=/usr/local/musl/bin:$PATH
+          export CC=musl-gcc
+          sudo apt update && sudo apt install -y musl-tools musl-dev
           go build -ldflags "-w -s -linkmode external -extldflags '-static'" -o xui-release -v main.go
           file xui-release
           ldd xui-release || echo "Static binary confirmed"
